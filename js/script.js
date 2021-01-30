@@ -4,7 +4,7 @@ var canvas;
 var ctx;
 const BLOCK_SIZE = 22;
 //  I, O, S, Z, T, J, L, field, none
-const COLOR = ["#00bfff", "#ffd700", "#32cd32", "#dc143c", "#9932cc", "#0000cd", "#ff8c00", "#c0c0c0", "#303030"];
+const COLOR = ["#00bfff", "#ffd700", "#32cd32", "#ff3030", "#ba55d3", "#5050ff", "#ff8c00", "#c0c0c0", "#303030"];
 const FIELD_WIDTH = 10;
 const FIELD_HEIGHT = 20;
 const FIELD_OFFSET_X = 80;
@@ -17,8 +17,10 @@ class Block {
         this.color = color;
     }
     draw() {
-        ctx.fillStyle = COLOR[this.color];
-        ctx.fillRect(this.x * (BLOCK_SIZE + 1) + FIELD_OFFSET_X, this.y * (BLOCK_SIZE + 1) + FIELD_OFFSET_Y, BLOCK_SIZE, BLOCK_SIZE);
+        if (this.y >= 0) {
+            ctx.fillStyle = COLOR[this.color];
+            ctx.fillRect(this.x * (BLOCK_SIZE + 1) + FIELD_OFFSET_X, this.y * (BLOCK_SIZE + 1) + FIELD_OFFSET_Y, BLOCK_SIZE, BLOCK_SIZE);
+        }
     }
 }
 
@@ -28,6 +30,89 @@ class Mino {
         this.y = y;
         this.rot = rot;
         this.shape = shape;
+    }
+
+    calcBlocks() {
+        let blocks = [];
+        switch (this.shape) {
+            case 0: // I
+                blocks = [
+                    new Block(2, 0, 0),
+                    new Block(1, 0, 0),
+                    new Block(0, 0, 0),
+                    new Block(-1, 0, 0),
+                ];
+                break;
+
+            case 1: // O
+                blocks = [
+                    new Block(0, 0, 1),
+                    new Block(1, 0, 1),
+                    new Block(0, -1, 1),
+                    new Block(1, -1, 1),
+                ];
+                break;
+
+            case 2: // S
+                blocks = [
+                    new Block(1, -1, 2),
+                    new Block(0, -1, 2),
+                    new Block(0, 0, 2),
+                    new Block(-1, 0, 2),
+                ];
+                break;
+
+            case 3: // Z
+                blocks = [
+                    new Block(-1, -1, 3),
+                    new Block(0, -1, 3),
+                    new Block(0, 0, 3),
+                    new Block(1, 0, 3),
+                ];
+                break;
+
+            case 4: // T
+                blocks = [
+                    new Block(0, 0, 4),
+                    new Block(1, 0, 4),
+                    new Block(0, -1, 4),
+                    new Block(-1, 0, 4),
+                ];
+                break;
+
+            case 5: // J
+                blocks = [
+                    new Block(-1, -1, 5),
+                    new Block(-1, 0, 5),
+                    new Block(0, 0, 5),
+                    new Block(1, 0, 5),
+                ];
+                break;
+
+            case 6: // L
+                blocks = [
+                    new Block(1, -1, 6),
+                    new Block(1, 0, 6),
+                    new Block(0, 0, 6),
+                    new Block(-1, 0, 6),
+                ];
+                break;
+        }
+
+        let rot = (40000000 + this.rot) % 4;
+        for (let i = 0; i < rot; i++) {
+            blocks = blocks.map(b => new Block(-b.y, b.x, b.color));
+        }
+
+        blocks.forEach(b => (b.x += this.x, b.y += this.y));
+        return blocks;
+    }
+
+    draw() {
+        let blocks = this.calcBlocks();
+        for (let b of blocks) {
+            b.draw();
+        }
     }
 }
 
