@@ -37,19 +37,19 @@ class Mino {
         switch (this.shape) {
             case 0: // I
                 blocks = [
-                    new Block(2, 0, 0),
-                    new Block(1, 0, 0),
-                    new Block(0, 0, 0),
+                    new Block(-2, 0, 0),
                     new Block(-1, 0, 0),
+                    new Block(0, 0, 0),
+                    new Block(1, 0, 0),
                 ];
                 break;
 
             case 1: // O
                 blocks = [
                     new Block(0, 0, 1),
-                    new Block(1, 0, 1),
+                    new Block(-1, 0, 1),
                     new Block(0, -1, 1),
-                    new Block(1, -1, 1),
+                    new Block(-1, -1, 1),
                 ];
                 break;
 
@@ -100,8 +100,14 @@ class Mino {
         }
 
         let rot = (40000000 + this.rot) % 4;
+        if (this.shape <= 1) {
+            blocks.forEach(b => (b.x += .5, b.y += .5));
+        }
         for (let i = 0; i < rot; i++) {
             blocks = blocks.map(b => new Block(-b.y, b.x, b.color));
+        }
+        if (this.shape <= 1) {
+            blocks.forEach(b => (b.x -= .5, b.y -= .5));
         }
 
         blocks.forEach(b => (b.x += this.x, b.y += this.y));
@@ -113,6 +119,10 @@ class Mino {
         for (let b of blocks) {
             b.draw();
         }
+    }
+
+    copy() {
+        return new Mino(this.x, this.y, this.rot, this.shape);
     }
 }
 
@@ -130,11 +140,7 @@ class Field {
             this.tiles[i][0] = 7;
             this.tiles[i][FIELD_WIDTH + 1] = 7;
         }
-        this.tiles[0].fill(7);
         this.tiles[FIELD_HEIGHT + 1].fill(7);
-        for (let i = 3; i <= 8; i++) {
-            this.tiles[0][i] = 8;
-        }
     }
 
     draw() {
@@ -144,6 +150,170 @@ class Field {
             }
         }
     }
+
+    putblock(x, y, c) {
+        this.tiles[y][x] = c;
+    }
+
+    tileAt(x, y) {
+        if (x < 0 || x >= FIELD_WIDTH + 2 || y < 0 || y >= FIELD_HEIGHT + 2) return 0;
+        return this.tiles[y][x];
+    }
+
+    findFilled() {
+        let res = new Array();
+        for (let i = 0; i < FIELD_HEIGHT + 1; i++) {
+            if (this.tiles[i].every(t => t < 8)) {
+                res.push(i);
+            }
+        }
+        return res;
+    }
+
+    cutLine(r) {
+        console.log("cut");
+        this.tiles.splice(r, 1);
+        let newLine = new Array(FIELD_WIDTH + 2).fill(8);
+        newLine[0] = 7;
+        newLine[newLine.length - 1] = 7;
+        this.tiles.unshift(newLine);
+    }
+}
+
+class Game {
+    constructor() {
+        this.frame = 0;
+        this.mino = Game.make_mino(Math.floor(Math.random() * 7));
+        this.field = new Field();
+        this.minoVx = 0;
+        this.minoVy = 0;
+        this.minoVr = 0;
+    }
+
+    static make_mino(shape) {
+        return new Mino(6, 0, 0, shape);
+    }
+
+    static isField(mino, field) {
+        let blocks = mino.calcBlocks();
+        return blocks.some(b => field.tileAt(b.x, b.y) < 8);
+    }
+
+    loop() {
+        // 落下
+        let future = this.mino.copy();
+        future.y++;
+        let isfield = Game.isField(future, this.field);
+        if (isfield) {
+            // 接地
+            if (this.frame % 90 == 0) {
+                let blocks = this.mino.calcBlocks();
+                blocks.forEach(b => this.field.putblock(b.x, b.y, this.mino.shape));
+                this.mino = Game.make_mino(Math.floor(Math.random() * 7));
+            }
+        } else {
+            if (this.frame % (keyDown ? softDropSpeed : dropSpeed) == 0) {
+                this.mino.y++;
+            }
+        }
+
+        // ライン消去
+        let rows = this.field.findFilled();
+        rows.forEach(r => {
+            this.field.cutLine(r);
+        });
+
+        // 左右移動
+        if (this.frame % 5 === 1 && keyLeft) {
+            this.minoVx--;
+        }
+        if (this.frame % 5 === 1 && keyRight) {
+            this.minoVx++;
+        }
+
+        if (this.minoVx !== 0) {
+            let future = this.mino.copy();
+            future.x += this.minoVx;
+            if (!Game.isField(future, this.field)) {
+                this.mino.x += this.minoVx;
+            }
+            this.minoVx = 0;
+        }
+
+        // 回転
+        if (this.minoVr !== 0) {
+            let future = this.mino.copy();
+            future.rot += this.minoVr;
+            if (!Game.isField(future, this.field)) {
+                this.mino.rot += this.minoVr;
+            }
+            this.minoVr = 0;
+        }
+
+        this.field.draw();
+        this.mino.draw();
+        this.frame++;
+    }
+}
+
+var game;
+var keyLeft = false;
+var keyRight = false;
+var keyDown = false;
+var gamestarted = false;
+var softDropSpeed = 5;
+var dropSpeed = 30;
+
+function getEvent() {
+    document.addEventListener("keydown", e => onKeyDown(e));
+    document.addEventListener("keyup", e => onKeyUp(e));
+}
+
+function onKeyDown(e) {
+    if (!gamestarted && e.keyCode == 32) {
+        if (e.preventDefault) {
+            e.preventDefault();
+        }
+        gamestarted = true;
+        init();
+        game = new Game();
+        tick();
+    }
+    switch (e.keyCode) {
+        case 37:
+            keyLeft = true;
+            break;
+        case 38:
+            break;
+        case 39:
+            keyRight = true;
+            break;
+        case 40:
+            keyDown = true;
+            break;
+        case 88:
+            game.minoVr++;
+            break;
+        case 90:
+            game.minoVr--;
+            break;
+    }
+}
+
+function onKeyUp(e) {
+    switch (e.keyCode) {
+        case 37:
+            keyLeft = false;
+            break;
+        case 38:
+            break;
+        case 39:
+            keyRight = false;
+            break;
+        case 40:
+            keyDown = false;
+            break;
+    }
 }
 
 function drawBackground() {
@@ -152,11 +322,14 @@ function drawBackground() {
 }
 
 function init() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
     new Field().draw();
 }
 
+
 function tick() {
+    game.loop();
     requestAnimationFrame(tick);
 }
 
@@ -164,7 +337,10 @@ $(function() {
     canvas = document.getElementById("canvas");
     if (canvas.getContext) {
         ctx = canvas.getContext("2d");
-        init();
-        tick();
+        getEvent();
+        ctx.font = '20pt Arial';
+        ctx.fillStyle = 'rgba(0, 0, 0)';
+        ctx.fillText("Press space key to start", 200, 150);
+
     }
 });
